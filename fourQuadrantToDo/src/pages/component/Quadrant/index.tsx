@@ -1,53 +1,49 @@
+import { useEffect, useState } from 'react';
 import './index.less';
-import React, { useEffect, useState } from 'react'
-import Locker from '../Locker'
-function insertAfter(newElement: any, targetElement: any) {
-  var parent = targetElement.parentNode;
-  if (parent.lastChild == targetElement) {
-    parent.appendChild(newElement);
-  } else {
-    parent.insertBefore(newElement, targetElement.nextSibling)
+
+
+
+function moveArrayIndexAToIndexB(arr: any, indexA: number, indexB: number) {
+  var temp = arr[indexA];
+  for (var i = indexA; i < indexB; i++) {
+    arr[i] = arr[i + 1]
   }
+  arr[indexB] = temp
+  return arr;
 }
 
-function createToDoRes(title: string) {
-  fetch('http://localhost:8000/todo', {
+function createToDoRes(title: string, completed: boolean, place: string) {
+  return fetch('http://localhost:8000/todo', {
     method: 'POST',
-    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-    body: `title=${title}`
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `title=${title}&completed=${completed}&place=${place}`
   })
-  .then(response => response.json())
-  .then(json => console.log(json))
-} 
+    .then(response => response.json())
+    .then(json => json)
+}
 
-function updateToDoRes(id: number, title: string, completed: boolean ) {
+function updateToDoRes(id: number, title: string, completed: boolean, place: string) {
   fetch(`http://localhost:8000/todo/${id}`, {
     method: 'PUT',
-    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-    body: `title=${title}&completed=${completed}`
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `title=${title}&completed=${completed}&place=${place}`
   })
-  .then(response => response.json())
-  .then(json => console.log(json))
-} 
+    .then(response => response.json())
+    .then(json => console.log(json))
+}
+
 
 function deleteToDoRes(id: number) {
   fetch(`http://localhost:8000/todo/${id}`, {
     method: 'DELETE'
   })
-  .then(response => response.json())
-  .then(json => console.log(json))
-} 
-
-function getTodoRes(title: string) {
-  alert(`${title}`)
+    .then(response => response.json())
+    .then(json => console.log(json))
 }
-
-
 
 export default function Quadrant(props: any) {
   const [value, setValue] = useState('');
-  const [grouplist, setgrouplist] = useState<any>([]);
-  
+  const [group, setGroup] = useState<any>([]);
 
   const handleOnChange = (e: any) => {
     setValue(e.target.value)
@@ -56,40 +52,40 @@ export default function Quadrant(props: any) {
   useEffect(() => {
     fetch('http://localhost:8000/todo/list')
       .then(response => response.json())
-      .then(json => setgrouplist(json.data))
+      .then(json => setGroup(json.data))
   }, [])
 
   const handleOnKeyPress = (e: any) => {
     if (e.which === 13) {
-      const obj = {
-        title: value,
-        completed: false
-      }
-      setgrouplist([...grouplist, obj])
-      createToDoRes(value)
+      createToDoRes(value, false, '3').then((json) => {
+        const obj = {
+          title: value,
+          completed: false,
+          place: '3',
+          id: json.id
+        }
+        setGroup([...group, obj])
+      })
+      setValue('')
     }
   }
 
-  const handleCompleted = (index: any) => {
-    const newGroupList = [...grouplist]
-    const todo = newGroupList[index];
+  const handleCompleted = (id: string) => {
+    const newGroup = [...group];
+    const index = newGroup.findIndex((item) => item.id === id);
+    const todo = newGroup[index];
     todo.completed = !todo.completed;
-    setgrouplist(newGroupList);
-    updateToDoRes(todo.id, todo.title, todo.completed)
+    setGroup(newGroup);
+    updateToDoRes(todo.id, todo.title, todo.completed, todo.place)
   }
 
-  const handleRemove = (index: number) => {
-    const newGroupList = [...grouplist]
-    const id = newGroupList[index].id
-    newGroupList.splice(index, 1)
-    setgrouplist(newGroupList)
-    deleteToDoRes(id)
-  }
-
-  const handleOnClick = (index: number) => {
-    const newGroupList = [...grouplist];
-    const todo = newGroupList[index];
-    getTodoRes(todo.title)
+  const handleRemove = (id: string) => {
+    const newGroup = [...group]
+    const index = newGroup.findIndex((item) => item.id === id)
+    const ID = newGroup[index].id
+    newGroup.splice(index, 1)
+    setGroup(newGroup);
+    deleteToDoRes(ID);
   }
 
   const allowDrop = (event: any) => {
@@ -102,26 +98,67 @@ export default function Quadrant(props: any) {
 
   const drop = (event: any) => {
     event.preventDefault();
+    event.stopPropagation();
     var data = event.dataTransfer.getData('id');
-    insertAfter(document.getElementById(data), event.target)
+    const id = data.substring(5);
+    const tar = event.target.id.substring(5);
+    const newGroup = [...group];
+    const index_1 = newGroup.findIndex((item: any) => item.id === id);
+    const index_2 = newGroup.findIndex((item: any) => item.id === tar);
+    moveArrayIndexAToIndexB(newGroup, index_1, index_2)
+    setGroup(newGroup)
+    console.log(data, 'data', event.target.id)
   }
 
-  const handleOnDrop = (event: any) => {
+  const handleOnDrop = (place: string, event: any) => {
     event.preventDefault();
+    event.stopPropagation();
     var data = event.dataTransfer.getData('id');
-
+    console.log(data);
+    const id = data.substring(5);
+    const index = group.findIndex((item: any) => item.id === id);
+    const newGroup = [...group];
+    const todo = newGroup[index];
+    todo.place = place;
+    setGroup(newGroup);
+    updateToDoRes(todo.id, todo.title, todo.completed, todo.place)
   }
 
   const arr = [];
   const newArr = [];
-  for (var i = 0; i <= grouplist.length - 1; i++) {
-    if (grouplist[i].completed === false) {
-      arr.push(grouplist[i])
-    } else { newArr.push(grouplist[i]) }
+  for (var i = 0; i <= group.length - 1; i++) {
+    if (group[i].completed === false) {
+      arr.push(group[i])
+    } else { newArr.push(group[i]) }
   }
+
+  const rendergroup = (group: any) => {
+    return (
+      <>
+        {group.map((item: any) => (
+          <div
+            className="Quadrant_items-1"
+            style={item.completed ? { display: "none" } : {}}
+            id={`drag_${item.id}`}
+            draggable={true}
+            onDragStart={drag}
+            onDrop={drop}
+            onDragOver={allowDrop}
+          >
+            <input className="Quadrant_box-1"
+              type="checkbox"
+              checked={item.completed}
+              onChange={() => handleCompleted(item.id)}
+            />
+            {item.title} - {item.id}
+            <div className="Quadrant_remove" onClick={() => handleRemove(item.id)}></div>
+          </div>
+        ))}
+      </>
+    )
+  }
+
   return (
-
-
     <div>
       <div className="Quadrant_nav">
         <div className="Quadrant_bar">
@@ -137,30 +174,23 @@ export default function Quadrant(props: any) {
 
       <div className='Quadrant_importance'>重要</div>
       <div className='Quadrant_wrapper'>
-        <div className='Quadrant_urgent'>不紧急</div>
+        <div className='Quadrant_urgence'>不紧急</div>
         <div className='Quadrant_group'>
-          <div className='Quadrant_item Quadrant_second' onDrop={handleOnDrop} onDragOver={allowDrop}></div>
-          <div className='Quadrant_item Quadrant_first' onDrop={handleOnDrop} onDragOver={allowDrop}></div>
-          <div className='Quadrant_item Quadrant_third' onDrop={handleOnDrop} onDragOver={allowDrop}>
-            {grouplist.map((item: any, index: number) => (
-              <div className="Quadrant_items-1"  onClick={() => handleOnClick(index)} style={item.completed ? { display: "none" } : {}}
-                id={`drag_${index}`} draggable={true} onDragStart={drag} onDrop={drop}
-                onDragOver={allowDrop}>
-                <input className="Quadrant_box-1"
-                  type="checkbox"
-                  checked={item.completed}
-                  onChange={() => handleCompleted(index)} />
-                {item.title}
-                <div className="Quadrant_remove" onClick={() => handleRemove(index)}></div>
-              </div>
-            ))}
+          <div className='Quadrant_item Quadrant_second' onDrop={(e) => handleOnDrop('2', e)} onDragOver={allowDrop}>
+            {rendergroup(group.filter((item: any) => String(item.place) === '2'))}
+          </div>
+          <div className='Quadrant_item Quadrant_first' onDrop={(e) => handleOnDrop('1', e)} onDragOver={allowDrop}>
+            {rendergroup(group.filter((item: any) => String(item.place) === '1'))}
+          </div>
+          <div className='Quadrant_item Quadrant_third' onDrop={(e) => handleOnDrop('3', e)} onDragOver={allowDrop}>
+            {rendergroup(group.filter((item: any) => String(item.place) === '3' || item.place === undefined))}
           </div>
 
-          <div className='Quadrant_item Quadrant_fourth' onDrop={handleOnDrop} onDragOver={allowDrop}>
-
+          <div className='Quadrant_item Quadrant_fourth' onDrop={(e) => handleOnDrop('4', e)} onDragOver={allowDrop}>
+            {rendergroup(group.filter((item: any) => String(item.place) === '4'))}
           </div>
         </div>
-        <div className='Quadrant_urgent'>紧急</div>
+        <div className='Quadrant_urgence'>紧急</div>
       </div>
       <div className='Quadrant_unImportance'>不重要</div>
 
@@ -170,21 +200,27 @@ export default function Quadrant(props: any) {
           <div className="Quadrant_count">{newArr.length}</div>
         </div>
         <div className="Quadrant_doneitems">
-          {grouplist.map((item: any, index: number) => (
-            <div className="Quadrant_items-2" style={item.completed ? {} : { display: "none" }}
-              id={`drag_${index}`} draggable={true} onDragStart={drag} onDrop={drop}
-              onDragOver={allowDrop}>
-              <input className="Quadrant_box-2"
+          {group.map((item: any) => (
+            <div
+              className="Quadrant_items-1"
+              style={item.completed ? {} : { display: "none" }}
+              id={`drag_${item.id}`}
+              draggable={true}
+              onDragStart={drag}
+              onDrop={drop}
+              onDragOver={allowDrop}
+            >
+              <input className="Quadrant_box-1"
                 type="checkbox"
                 checked={item.completed}
-                onChange={() => handleCompleted(index)} />
+                onChange={() => handleCompleted(item.id)}
+              />
               {item.title}
-              <div className="Quadrant_remove" onClick={() => handleRemove(index)}></div>
+              <div className="Quadrant_remove" onClick={() => handleRemove(item.id)}></div>
             </div>
           ))}
         </div>
       </div>
-      <Locker />
     </div>
   );
 }
